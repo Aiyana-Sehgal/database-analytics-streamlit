@@ -1,0 +1,25 @@
+# Core app
+fastapi
+uvicorn[standard]
+
+# File + data processing
+pandas
+python-multipart
+
+# LLMs and Embeddings
+transformers
+sentence-transformers
+
+# LangChain (community connectors)
+langchain
+langchain-community
+
+# Vector DB
+chromadb
+
+# SQLite utility (optional)
+sqlite-utils
+
+
+streamlit 
+google-generativeai

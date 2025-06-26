@@ -1,0 +1,31 @@
+# 🐍 Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.so
+
+# 🚫 Virtual environments
+.venv/
+env/
+venv/
+
+# 💼 IDE/editor config
+.vscode/
+.idea/
+
+# ⚙️ System files
+.DS_Store
+Thumbs.db
+
+# 📦 Package logs and build
+*.log
+*.egg-info/
+dist/
+build/
+
+# 🔐 Secrets and private configs
+secrets.toml
+*.env
+
+# 📁 User uploads or persistent data
+uploads/
+chroma_store/
