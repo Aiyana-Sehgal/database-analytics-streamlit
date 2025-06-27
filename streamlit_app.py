@@ -8,7 +8,9 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
+import sqlite3
 import re
+
 
 # 🔐 Set your Gemini API key
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
@@ -97,3 +99,6 @@ if uploaded_file:
 
         except Exception as e:
             st.error(f"Something went wrong: {e}")
+
+
+# streamlit run streamlit_app.py
