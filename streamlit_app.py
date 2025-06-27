@@ -4,8 +4,8 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 from langchain_community.utilities import SQLDatabase
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
 import sqlite3

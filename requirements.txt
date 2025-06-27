@@ -20,6 +20,6 @@ chromadb
 # SQLite utility (optional)
 sqlite-utils
 
-pysqlite3  # Uncomment only if you need it
+# pysqlite3  # Uncomment only if you need it
 streamlit 
 google-generativeai
