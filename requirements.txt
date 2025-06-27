@@ -1,25 +1,25 @@
 # Core app
+streamlit==1.35.0
 fastapi
 uvicorn[standard]
 
-# File + data processing
+# Data processing
 pandas
 python-multipart
 
 # LLMs and Embeddings
 transformers
 sentence-transformers
+google-generativeai
 
-# LangChain (community connectors)
-langchain
+# LangChain + connectors
+langchain==0.1.20
 langchain-community
+langchain-huggingface
+langchain-chroma
 
 # Vector DB
-chromadb
+chromadb==0.4.24
 
-# SQLite utility (optional)
-sqlite-utils
-
-# pysqlite3  # Uncomment only if you need it
-streamlit 
-google-generativeai
+# Optional SQLite CLI helper (commented out)
+# sqlite-utils

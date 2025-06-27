@@ -3,13 +3,14 @@ import uuid
 import sqlite3
 import pandas as pd
 import streamlit as st
+import re
+
 from langchain_community.utilities import SQLDatabase
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
-import sqlite3
-import re
+
 
 
 # 🔐 Set your Gemini API key
