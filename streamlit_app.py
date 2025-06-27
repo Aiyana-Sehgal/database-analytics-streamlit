@@ -7,11 +7,11 @@ import re
 
 from langchain_community.utilities import SQLDatabase
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
 
-
+from chromadb import PersistentClient
+from langchain_chroma import Chroma
 
 # 🔐 Set your Gemini API key
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
@@ -54,7 +54,13 @@ if uploaded_file:
     df.to_sql("uploaded_table", conn, index=False, if_exists="replace")
 
     docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
-    vectordb = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+    client = PersistentClient(path=CHROMA_PATH)
+
+    vectordb = Chroma(
+        client=client,
+        collection_name="default",
+        embedding_function=embeddings
+    )
     vectordb.add_texts(docs, metadatas=[{"source": file_id}] * len(docs))
 
     conn.close()
