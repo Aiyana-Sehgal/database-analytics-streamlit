@@ -1,25 +1,12 @@
-# Core app
-streamlit==1.35.0
-fastapi
-uvicorn[standard]
-
-# Data processing
+streamlit>=1.30
 pandas
-python-multipart
-
-# LLMs and Embeddings
-transformers
-sentence-transformers
-google-generativeai
-
-# LangChain + connectors
-langchain==0.1.20
+duckdb
+chromadb
+uuid
+langchain
 langchain-community
 langchain-huggingface
-langchain-chroma
-
-# Vector DB
-chromadb==0.4.24
-
-# Optional SQLite CLI helper (commented out)
-# sqlite-utils
+huggingface-hub
+google-generativeai
+transformers
+torch

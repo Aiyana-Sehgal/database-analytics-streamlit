@@ -1,9 +1,10 @@
 import os
 import uuid
-import sqlite3
+import duckdb
 import pandas as pd
 import streamlit as st
 import re
+import hashlib
 
 from langchain_community.utilities import SQLDatabase
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -21,10 +22,13 @@ gemini_model = GenerativeModel("gemini-1.5-flash")
 def gemini_llm(prompt):
     try:
         response = gemini_model.generate_content(prompt)
-        text = getattr(response, "text", "").strip()
-        return text if text else "[Gemini returned no content]"
+        return getattr(response, "text", "").strip() or "[Gemini returned no content]"
     except Exception as e:
         return f"[Gemini error: {str(e)}]"
+
+def file_hash(path):
+    with open(path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()
 
 # ✅ Set up directories
 UPLOAD_DIR = "uploads"
@@ -49,19 +53,21 @@ if uploaded_file:
     df = pd.read_csv(csv_path)
     st.dataframe(df.head())
 
-    db_path = os.path.join(UPLOAD_DIR, f"{file_id}.db")
-    conn = sqlite3.connect(db_path)
-    df.to_sql("uploaded_table", conn, index=False, if_exists="replace")
+    db_path = os.path.join(UPLOAD_DIR, f"{file_id}.duckdb")
+    conn = duckdb.connect(database=db_path)
+    conn.execute("CREATE OR REPLACE TABLE uploaded_table AS SELECT * FROM df")
 
-    docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
+    # Embed only if not already embedded
+    hash_id = file_hash(csv_path)
     client = PersistentClient(path=CHROMA_PATH)
-
     vectordb = Chroma(
         client=client,
         collection_name="default",
         embedding_function=embeddings
     )
-    vectordb.add_texts(docs, metadatas=[{"source": file_id}] * len(docs))
+    if not any(d.get("source") == hash_id for d in vectordb.get()["metadatas"]):
+        docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
+        vectordb.add_texts(docs, metadatas=[{"source": hash_id}] * len(docs))
 
     conn.close()
     st.success("File uploaded and embedded!")
@@ -73,7 +79,7 @@ if uploaded_file:
         sql_prompt = PromptTemplate(
             input_variables=["columns", "question"],
             template=(
-                "You are an expert in SQLite.\n"
+                "You are an expert in SQL.\n"
                 "You're querying a table called 'uploaded_table'.\n"
                 "It contains the following columns: {columns}\n"
                 "User asked: '{question}'\n"
@@ -85,27 +91,26 @@ if uploaded_file:
         sql_raw = gemini_llm(dynamic_prompt)
         sql_query = re.sub(r"```(?:sql)?\s*([\s\S]*?)\s*```", r"\1", sql_raw).strip()
 
-        st.code(sql_query, language="sql")
+        if not sql_query.lower().startswith("select"):
+            st.warning("⚠️ Gemini did not return a valid SQL query.")
+        else:
+            st.code(sql_query, language="sql")
+            try:
+                db = SQLDatabase.from_uri(f"duckdb:///{db_path}")
+                result = db.run(sql_query)
+                st.write("📈 SQL Result:", result)
 
-        try:
-            db = SQLDatabase.from_uri(f"sqlite:///{db_path}")
-            result = db.run(sql_query)
-            st.write("📈 SQL Result:", result)
+                docs = vectordb.similarity_search(question, k=3)
+                context = "\n".join([doc.page_content for doc in docs])
 
-            docs = vectordb.similarity_search(question, k=3)
-            context = "\n".join([doc.page_content for doc in docs])
+                final_prompt = (
+                    f"You are a data analyst. A user asked: '{question}'.\n"
+                    f"The SQL query result is:\n{result}\n"
+                    f"Contextual data from the database:\n{context}\n"
+                    f"Provide a helpful answer."
+                )
+                answer = gemini_llm(final_prompt)
+                st.success(answer)
 
-            final_prompt = (
-                f"You are a data analyst. A user asked: '{question}'.\n"
-                f"The SQL query result is:\n{result}\n"
-                f"Contextual data from the database:\n{context}\n"
-                f"Provide a helpful answer."
-            )
-            answer = gemini_llm(final_prompt)
-            st.success(answer)
-
-        except Exception as e:
-            st.error(f"Something went wrong: {e}")
-
-
-# streamlit run streamlit_app.py
+            except Exception as e:
+                st.error(f"Something went wrong: {e}")
