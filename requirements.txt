@@ -1,8 +1,7 @@
-streamlit>=1.30
+streamlit
 pandas
 duckdb
 chromadb
-uuid
 langchain
 langchain-community
 langchain-huggingface

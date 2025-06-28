@@ -11,10 +11,10 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
 
-from chromadb import PersistentClient
+from chromadb import Client
 from langchain_chroma import Chroma
 
-# 🔐 Set your Gemini API key
+# 🔐 Gemini setup
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 configure(api_key=os.environ["GOOGLE_API_KEY"])
 gemini_model = GenerativeModel("gemini-1.5-flash")
@@ -30,16 +30,15 @@ def file_hash(path):
     with open(path, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
 
-# ✅ Set up directories
+# 📁 Setup
 UPLOAD_DIR = "uploads"
-CHROMA_PATH = "chroma_store"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(CHROMA_PATH, exist_ok=True)
 
-# Embeddings
+# 🔍 Embeddings
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-small-v2")
 
-st.set_page_config(page_title="Gemini CSV SQL Assistant", layout="centered")
+# 🎨 Streamlit UI
+st.set_page_config(page_title="Gemini SQL RAG Chatbot", layout="centered")
 st.title("📊 Gemini SQL RAG Chatbot")
 
 uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
@@ -57,17 +56,15 @@ if uploaded_file:
     conn = duckdb.connect(database=db_path)
     conn.execute("CREATE OR REPLACE TABLE uploaded_table AS SELECT * FROM df")
 
-    # Embed only if not already embedded
-    hash_id = file_hash(csv_path)
-    client = PersistentClient(path=CHROMA_PATH)
+    # 🧠 In-memory Chroma
+    docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
+    client = Client()
     vectordb = Chroma(
         client=client,
         collection_name="default",
         embedding_function=embeddings
     )
-    if not any(d.get("source") == hash_id for d in vectordb.get()["metadatas"]):
-        docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
-        vectordb.add_texts(docs, metadatas=[{"source": hash_id}] * len(docs))
+    vectordb.add_texts(docs, metadatas=[{"source": file_id}] * len(docs))
 
     conn.close()
     st.success("File uploaded and embedded!")
