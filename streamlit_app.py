@@ -4,7 +4,6 @@ import duckdb
 import pandas as pd
 import streamlit as st
 import re
-import hashlib
 
 from langchain_community.utilities import SQLDatabase
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -14,7 +13,7 @@ from google.generativeai import configure, GenerativeModel
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
-# 🔐 Gemini setup
+# 🔐 Gemini Setup
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 configure(api_key=os.environ["GOOGLE_API_KEY"])
 gemini_model = GenerativeModel("gemini-1.5-flash")
@@ -26,11 +25,11 @@ def gemini_llm(prompt):
     except Exception as e:
         return f"[Gemini error: {str(e)}]"
 
-# 📁 Setup
+# 📁 File Storage
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 🔍 Embeddings
+# 🔍 Embedding Model
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-small-v2")
 
 # 🎨 Streamlit UI
@@ -52,7 +51,7 @@ if uploaded_file:
     conn = duckdb.connect(database=db_path)
     conn.execute("CREATE OR REPLACE TABLE uploaded_table AS SELECT * FROM df")
 
-    # 🧠 FAISS vector store
+    # 🧠 FAISS Vector Store
     docs = [
         Document(
             page_content=", ".join([f"{col}={row[col]}" for col in df.columns]),

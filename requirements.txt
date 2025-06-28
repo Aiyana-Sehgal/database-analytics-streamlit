@@ -6,6 +6,7 @@ langchain
 langchain-community
 langchain-huggingface
 huggingface-hub
+sentence-transformers
 google-generativeai
 transformers
 torch
