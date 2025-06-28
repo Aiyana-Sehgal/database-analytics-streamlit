@@ -11,8 +11,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
 
-from chromadb import Client
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 
 # 🔐 Gemini setup
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
@@ -25,10 +25,6 @@ def gemini_llm(prompt):
         return getattr(response, "text", "").strip() or "[Gemini returned no content]"
     except Exception as e:
         return f"[Gemini error: {str(e)}]"
-
-def file_hash(path):
-    with open(path, "rb") as f:
-        return hashlib.md5(f.read()).hexdigest()
 
 # 📁 Setup
 UPLOAD_DIR = "uploads"
@@ -56,15 +52,15 @@ if uploaded_file:
     conn = duckdb.connect(database=db_path)
     conn.execute("CREATE OR REPLACE TABLE uploaded_table AS SELECT * FROM df")
 
-    # 🧠 In-memory Chroma
-    docs = [", ".join([f"{col}={row[col]}" for col in df.columns]) for _, row in df.iterrows()]
-    client = Client()
-    vectordb = Chroma(
-        client=client,
-        collection_name="default",
-        embedding_function=embeddings
-    )
-    vectordb.add_texts(docs, metadatas=[{"source": file_id}] * len(docs))
+    # 🧠 FAISS vector store
+    docs = [
+        Document(
+            page_content=", ".join([f"{col}={row[col]}" for col in df.columns]),
+            metadata={"source": file_id}
+        )
+        for _, row in df.iterrows()
+    ]
+    vectordb = FAISS.from_documents(docs, embedding=embeddings)
 
     conn.close()
     st.success("File uploaded and embedded!")

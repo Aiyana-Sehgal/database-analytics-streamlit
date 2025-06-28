@@ -1,7 +1,7 @@
 streamlit
 pandas
 duckdb
-chromadb
+faiss-cpu
 langchain
 langchain-community
 langchain-huggingface
