@@ -6,12 +6,14 @@ import streamlit as st
 import re
 
 from langchain_community.utilities import SQLDatabase
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from google.generativeai import configure, GenerativeModel
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+
+from transformers import AutoModel, AutoTokenizer
+from langchain.embeddings import HuggingFaceEmbeddings
 
 # 🔐 Gemini Setup
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
@@ -25,12 +27,56 @@ def gemini_llm(prompt):
     except Exception as e:
         return f"[Gemini error: {str(e)}]"
 
+def validate_sql_query(query: str, db_path: str) -> tuple[bool, str]:
+    try:
+        conn = duckdb.connect(database=db_path)
+        conn.execute(f"EXPLAIN {query}")
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+def generate_valid_sql(question: str, columns: str, db_path: str, max_retries=2) -> str:
+    for i in range(max_retries):
+        sql_prompt = PromptTemplate(
+            input_variables=["columns", "question"],
+            template=(
+                "You are an expert in DuckDB SQL.\n"
+                "You're querying a table called 'uploaded_table'. It has the following columns: {columns}\n\n"
+                "Please follow DuckDB syntax rules carefully:\n"
+                "- Always wrap column names with double quotes.\n"
+                "- When using aggregate functions (like MAX, AVG), do one of the following:\n"
+                "  - Use a GROUP BY clause for non-aggregated columns.\n"
+                "  - OR use ANY_VALUE() if the exact value is not critical.\n"
+                "  - OR use a subquery to fetch the full row with MAX/MIN/etc.\n\n"
+                "User question: '{question}'\n"
+                "Return a valid SQL SELECT query that starts with SELECT and uses DuckDB-compatible syntax.\n"
+                "Only return the raw SQL without commentary or markdown."
+                "Wrap all column names in double quotes, especially if they contain spaces, slashes, or underscores."
+            )
+        )
+        prompt = sql_prompt.format(columns=columns, question=question)
+        query = gemini_llm(prompt)
+        query_clean = re.sub(r"```(?:sql)?\s*([\s\S]*?)\s*```", r"\1", query).strip()
+
+        is_valid, error = validate_sql_query(query_clean, db_path)
+        if is_valid:
+            return query_clean
+        else:
+            question = (
+                f"The last SQL query failed with error:\n{error}\n"
+                f"Please regenerate a correct DuckDB SQL query that answers: {question}"
+            )
+    return ""
+
 # 📁 File Storage
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 🔍 Embedding Model
-embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-small-v2")
+# ✅ Safe Embedding Loading (no meta tensors)
+embeddings = HuggingFaceEmbeddings(
+    model_name="intfloat/e5-small-v2",
+    model_kwargs={"device": "cpu"}
+)
 
 # 🎨 Streamlit UI
 st.set_page_config(page_title="Gemini SQL RAG Chatbot", layout="centered")
@@ -45,6 +91,12 @@ if uploaded_file:
         f.write(uploaded_file.read())
 
     df = pd.read_csv(csv_path)
+
+    # 🧼 Sanitize column names
+    original_columns = df.columns.tolist()
+    sanitized_columns = [col.replace("/", "_").replace(" ", "_") for col in original_columns]
+    df.columns = sanitized_columns
+
     st.dataframe(df.head())
 
     db_path = os.path.join(UPLOAD_DIR, f"{file_id}.duckdb")
@@ -68,23 +120,10 @@ if uploaded_file:
 
     if st.button("Run") and question:
         columns = ", ".join(df.columns)
-        sql_prompt = PromptTemplate(
-            input_variables=["columns", "question"],
-            template=(
-                "You are an expert in SQL.\n"
-                "You're querying a table called 'uploaded_table'.\n"
-                "It contains the following columns: {columns}\n"
-                "User asked: '{question}'\n"
-                "Write a valid SQL SELECT query to answer this. Do not include markdown or explanations.\n"
-                "Only return raw SQL starting with SELECT."
-            )
-        )
-        dynamic_prompt = sql_prompt.format(columns=columns, question=question)
-        sql_raw = gemini_llm(dynamic_prompt)
-        sql_query = re.sub(r"```(?:sql)?\s*([\s\S]*?)\s*```", r"\1", sql_raw).strip()
+        sql_query = generate_valid_sql(question, columns, db_path)
 
-        if not sql_query.lower().startswith("select"):
-            st.warning("⚠️ Gemini did not return a valid SQL query.")
+        if not sql_query or not sql_query.lower().startswith("select"):
+            st.warning("⚠️ Gemini was unable to generate a valid SQL query.")
         else:
             st.code(sql_query, language="sql")
             try:
@@ -99,7 +138,7 @@ if uploaded_file:
                     f"You are a data analyst. A user asked: '{question}'.\n"
                     f"The SQL query result is:\n{result}\n"
                     f"Contextual data from the database:\n{context}\n"
-                    f"Provide a helpful answer."
+                    f"Provide a helpful, clear response."
                 )
                 answer = gemini_llm(final_prompt)
                 st.success(answer)
