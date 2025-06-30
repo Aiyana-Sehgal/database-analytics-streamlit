@@ -7,7 +7,8 @@ langchain
 langchain-community
 langchain-huggingface
 huggingface-hub
-transformers==4.38.2
+transformers>=4.39.0
+tokenizers>=0.19.1
 torch==2.1.2
 sentence-transformers==2.2.2
 google-generativeai
