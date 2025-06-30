@@ -5,10 +5,9 @@ duckdb-engine
 faiss-cpu
 langchain
 langchain-community
-langchain-huggingface
-huggingface-hub
+langchain-huggingface==0.3.0
 transformers>=4.39.0
 tokenizers>=0.19.1
-torch==2.1.2
-sentence-transformers==2.2.2
+torch
+sentence-transformers
 google-generativeai
